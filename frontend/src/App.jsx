@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { API_BASE_URL, request } from "./api";
 
@@ -11,10 +11,9 @@ const mealTypes = [
 ];
 
 const tabs = [
-  { id: "recipes", label: "Recipes" },
-  { id: "ingredients", label: "Ingredients" },
-  { id: "units", label: "Units" },
-  { id: "meal-plans", label: "Meal Plans" },
+  { id: "recipe-search", label: "Wyszukiwarka przepisów" },
+  { id: "recipe-creation", label: "Tworzenie przepisów" },
+  { id: "meal-plans", label: "Tworzenie planu" },
 ];
 
 const emptyRecipeIngredientRow = () => ({
@@ -100,9 +99,7 @@ function groupMealPlanItems(items) {
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([date, groupedItems]) => ({
       date,
-      items: [...groupedItems].sort((left, right) =>
-        left.meal_type.localeCompare(right.meal_type),
-      ),
+      items: [...groupedItems].sort((left, right) => left.meal_type.localeCompare(right.meal_type)),
     }));
 }
 
@@ -110,14 +107,92 @@ function isBlank(value) {
   return String(value ?? "").trim() === "";
 }
 
+function sortRecipes(recipes, sortBy, sortDirection) {
+  const sortedRecipes = [...recipes];
+
+  sortedRecipes.sort((left, right) => {
+    let comparison = 0;
+
+    if (sortBy === "name") {
+      comparison = left.name.localeCompare(right.name);
+    } else if (sortBy === "meal_type") {
+      comparison = formatMealType(left.meal_type).localeCompare(formatMealType(right.meal_type));
+    } else if (sortBy === "servings") {
+      comparison = left.servings - right.servings;
+    } else {
+      comparison = new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+    }
+
+    return sortDirection === "asc" ? comparison : comparison * -1;
+  });
+
+  return sortedRecipes;
+}
+
+function recipeMatchesSearch(recipe, searchTerm) {
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  const searchableParts = [
+    recipe.name,
+    recipe.description,
+    formatMealType(recipe.meal_type),
+    ...recipe.ingredients.map((ingredient) => ingredient.ingredient_name),
+  ];
+
+  return searchableParts.some((value) =>
+    String(value ?? "").toLowerCase().includes(normalizedSearch),
+  );
+}
+
+function RecipeCards({ recipes }) {
+  return (
+    <div className="card-list">
+      {recipes.map((recipe) => (
+        <article className="data-card" key={recipe.id}>
+          <div className="data-card-header">
+            <div>
+              <h4>{recipe.name}</h4>
+              <p className="helper">
+                {formatMealType(recipe.meal_type)} • {recipe.servings} servings
+              </p>
+            </div>
+            <span className="pill subtle">{formatDateTime(recipe.created_at)}</span>
+          </div>
+
+          {recipe.description ? <p className="card-copy">{recipe.description}</p> : null}
+
+          <div className="chip-list">
+            {recipe.ingredients.map((ingredient) => (
+              <span className="pill" key={ingredient.id}>
+                {ingredient.quantity} {ingredient.unit_short_name} {ingredient.ingredient_name}
+              </span>
+            ))}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function App() {
-  const [activeTab, setActiveTab] = useState("recipes");
+  const [activeTab, setActiveTab] = useState("recipe-search");
   const [ingredients, setIngredients] = useState([]);
   const [units, setUnits] = useState([]);
   const [recipes, setRecipes] = useState([]);
   const [mealPlans, setMealPlans] = useState([]);
   const [selectedMealPlanId, setSelectedMealPlanId] = useState(null);
   const [selectedMealPlan, setSelectedMealPlan] = useState(null);
+  const [recipeSortBy, setRecipeSortBy] = useState("created_at");
+  const [recipeSortDirection, setRecipeSortDirection] = useState("desc");
+  const [recipeSearchTerm, setRecipeSearchTerm] = useState("");
+  const [creationTarget, setCreationTarget] = useState(null);
+
+  const recipeFormRef = useRef(null);
+  const unitFormRef = useRef(null);
 
   const [recipeForm, setRecipeForm] = useState(createInitialRecipeForm);
   const [ingredientForm, setIngredientForm] = useState(createInitialIngredientForm);
@@ -272,6 +347,16 @@ function App() {
     loadMealPlanDetail(selectedMealPlanId);
   }, [selectedMealPlanId]);
 
+  useEffect(() => {
+    if (activeTab !== "recipe-creation" || !creationTarget) {
+      return;
+    }
+
+    const targetRef = creationTarget === "unit" ? unitFormRef : recipeFormRef;
+    targetRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setCreationTarget(null);
+  }, [activeTab, creationTarget]);
+
   const updateRecipeField = (field, value) => {
     setRecipeForm((current) => ({
       ...current,
@@ -342,8 +427,7 @@ function App() {
     setRecipeSuccessMessage("");
 
     const hasEmptyIngredient = recipeForm.ingredients.some(
-      (row) =>
-        isBlank(row.ingredient_id) || isBlank(row.quantity) || isBlank(row.unit_id),
+      (row) => isBlank(row.ingredient_id) || isBlank(row.quantity) || isBlank(row.unit_id),
     );
 
     if (!recipeForm.name.trim()) {
@@ -458,9 +542,7 @@ function App() {
     setMealPlanSubmitError("");
     setMealPlanSuccessMessage("");
 
-    const hasEmptyItem = mealPlanForm.items.some(
-      (item) => isBlank(item.date) || isBlank(item.recipe_id),
-    );
+    const hasEmptyItem = mealPlanForm.items.some((item) => isBlank(item.date) || isBlank(item.recipe_id));
 
     if (!mealPlanForm.name.trim()) {
       setMealPlanSubmitError("Meal plan name is required.");
@@ -518,6 +600,16 @@ function App() {
     [selectedMealPlan],
   );
 
+  const sortedRecipes = useMemo(
+    () => sortRecipes(recipes, recipeSortBy, recipeSortDirection),
+    [recipeSortBy, recipeSortDirection, recipes],
+  );
+
+  const filteredRecipes = useMemo(
+    () => recipes.filter((recipe) => recipeMatchesSearch(recipe, recipeSearchTerm)),
+    [recipeSearchTerm, recipes],
+  );
+
   const recipesTabCanSubmit =
     !isLoadingIngredients &&
     !isLoadingUnits &&
@@ -525,10 +617,12 @@ function App() {
     ingredients.length > 0 &&
     units.length > 0;
 
-  const mealPlansTabCanSubmit =
-    !isLoadingRecipes &&
-    !isSubmittingMealPlan &&
-    recipes.length > 0;
+  const mealPlansTabCanSubmit = !isLoadingRecipes && !isSubmittingMealPlan && recipes.length > 0;
+
+  const openCreationSection = (target) => {
+    setCreationTarget(target);
+    setActiveTab("recipe-creation");
+  };
 
   return (
     <div className="page-shell">
@@ -538,16 +632,16 @@ function App() {
       <main className="app-layout">
         <section className="hero-card">
           <p className="eyebrow">Kitchen Studio</p>
-          <h1>Plan recipes, pantry basics, and the week ahead in one place.</h1>
+          <h1>Nowy układ pracy z przepisami, jednostkami i planem posiłków.</h1>
           <p className="hero-copy">
-            This workspace now covers recipe entry, ingredient and unit setup, and
-            simple meal-plan scheduling from the same frontend.
+            Główna strona została uproszczona do trzech głównych zakładek, żeby łatwiej było
+            przełączać się między wyszukiwaniem, tworzeniem przepisów i planowaniem.
           </p>
 
           <div className="hero-pills">
-            <span>Recipe library</span>
-            <span>Ingredient management</span>
-            <span>Meal plan timeline</span>
+            <span>3 główne zakładki</span>
+            <span>{recipes.length} przepisów</span>
+            <span>{units.length} jednostek</span>
           </div>
 
           <div className="hero-meta">
@@ -604,16 +698,90 @@ function App() {
             </button>
           </div>
 
-          {activeTab === "recipes" ? (
+          {activeTab === "recipe-search" ? (
             <div className="tab-panel">
               <div className="panel-grid">
                 <section className="panel-card">
                   <div className="section-heading">
                     <div>
-                      <p className="section-kicker">New recipe</p>
-                      <h3>Recipe details</h3>
+                      <p className="section-kicker">Szybkie akcje</p>
+                      <h3>Wyszukiwarka przepisów</h3>
                     </div>
-                    <p className="section-note">Create a recipe with its ingredient breakdown.</p>
+                    <p className="section-note">Tutaj zostawiłem skróty do najczęściej używanych akcji.</p>
+                  </div>
+
+                  <div className="action-list">
+                    <button type="button" className="secondary-button action-button" onClick={() => openCreationSection("recipe")}>
+                      Dodaj przepis
+                    </button>
+                    <button type="button" className="ghost-button action-button" onClick={() => openCreationSection("unit")}>
+                      Dodaj jednostkę
+                    </button>
+                  </div>
+
+                  <div className="stack-section">
+                    <div className="section-heading">
+                      <div>
+                        <p className="section-kicker">Podsumowanie</p>
+                        <h3>Stan biblioteki</h3>
+                      </div>
+                    </div>
+
+                    <div className="chip-list">
+                      <span className="pill">Przepisy: {recipes.length}</span>
+                      <span className="pill">Składniki: {ingredients.length}</span>
+                      <span className="pill">Jednostki: {units.length}</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="panel-card">
+                  <div className="section-heading">
+                    <div>
+                      <p className="section-kicker">Biblioteka</p>
+                      <h3>Zapisane przepisy</h3>
+                    </div>
+                    <p className="section-note">Lista przepisów została pod ręką w zakładce wyszukiwarki.</p>
+                  </div>
+
+                  <div className="search-row">
+                    <label className="field">
+                      <span>Szukaj przepisu</span>
+                      <input
+                        type="search"
+                        value={recipeSearchTerm}
+                        onChange={(event) => setRecipeSearchTerm(event.target.value)}
+                        placeholder="np. pasta, dinner, pomidor"
+                      />
+                    </label>
+                  </div>
+
+                  {recipeLoadError ? <div className="banner error">{recipeLoadError}</div> : null}
+                  {isLoadingRecipes ? <p className="helper">Loading recipes...</p> : null}
+                  {!isLoadingRecipes && recipes.length === 0 ? (
+                    <p className="helper">No recipes yet. The first saved recipe will appear here.</p>
+                  ) : null}
+                  {!isLoadingRecipes && recipes.length > 0 && filteredRecipes.length === 0 ? (
+                    <p className="helper">Nie znaleziono przepisów pasujących do wyszukiwania.</p>
+                  ) : null}
+                  {!isLoadingRecipes && filteredRecipes.length > 0 ? (
+                    <RecipeCards recipes={filteredRecipes} />
+                  ) : null}
+                </section>
+              </div>
+            </div>
+          ) : null}
+
+          {activeTab === "recipe-creation" ? (
+            <div className="tab-panel">
+              <div className="panel-grid">
+                <section className="panel-card" ref={recipeFormRef}>
+                  <div className="section-heading">
+                    <div>
+                      <p className="section-kicker">Nowy przepis</p>
+                      <h3>Tworzenie przepisów</h3>
+                    </div>
+                    <p className="section-note">Dodaj przepis razem z listą składników i jednostkami.</p>
                   </div>
 
                   {ingredientLoadError ? <div className="banner error">{ingredientLoadError}</div> : null}
@@ -674,11 +842,7 @@ function App() {
                           <p className="section-kicker">Ingredients</p>
                           <h3>What goes into it?</h3>
                         </div>
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={addRecipeIngredientRow}
-                        >
+                        <button type="button" className="secondary-button" onClick={addRecipeIngredientRow}>
                           Add ingredient
                         </button>
                       </div>
@@ -687,10 +851,10 @@ function App() {
                         <p className="helper">Loading ingredient and unit options...</p>
                       ) : null}
                       {!isLoadingIngredients && ingredients.length === 0 ? (
-                        <p className="helper">No ingredients found yet. Add some in the Ingredients tab.</p>
+                        <p className="helper">No ingredients found yet. Add some below first.</p>
                       ) : null}
                       {!isLoadingUnits && units.length === 0 ? (
-                        <p className="helper">No units found yet. Add some in the Units tab.</p>
+                        <p className="helper">No units found yet. Add some below first.</p>
                       ) : null}
 
                       <div className="row-list">
@@ -702,9 +866,7 @@ function App() {
                               <span>Ingredient</span>
                               <select
                                 value={row.ingredient_id}
-                                onChange={(event) =>
-                                  updateRecipeIngredientRow(row.id, "ingredient_id", event.target.value)
-                                }
+                                onChange={(event) => updateRecipeIngredientRow(row.id, "ingredient_id", event.target.value)}
                               >
                                 <option value="">Select ingredient</option>
                                 {ingredients.map((ingredient) => (
@@ -722,9 +884,7 @@ function App() {
                                 min="0"
                                 step="0.01"
                                 value={row.quantity}
-                                onChange={(event) =>
-                                  updateRecipeIngredientRow(row.id, "quantity", event.target.value)
-                                }
+                                onChange={(event) => updateRecipeIngredientRow(row.id, "quantity", event.target.value)}
                                 placeholder="2"
                               />
                             </label>
@@ -733,9 +893,7 @@ function App() {
                               <span>Unit</span>
                               <select
                                 value={row.unit_id}
-                                onChange={(event) =>
-                                  updateRecipeIngredientRow(row.id, "unit_id", event.target.value)
-                                }
+                                onChange={(event) => updateRecipeIngredientRow(row.id, "unit_id", event.target.value)}
                               >
                                 <option value="">Select unit</option>
                                 {units.map((unit) => (
@@ -746,11 +904,7 @@ function App() {
                               </select>
                             </label>
 
-                            <button
-                              type="button"
-                              className="ghost-button"
-                              onClick={() => removeRecipeIngredientRow(row.id)}
-                            >
+                            <button type="button" className="ghost-button" onClick={() => removeRecipeIngredientRow(row.id)}>
                               Remove
                             </button>
                           </div>
@@ -769,53 +923,42 @@ function App() {
                 <section className="panel-card">
                   <div className="section-heading">
                     <div>
-                      <p className="section-kicker">Library</p>
-                      <h3>Recipes already saved</h3>
+                      <p className="section-kicker">Sortowanie</p>
+                      <h3>Filtry dla listy przepisów</h3>
                     </div>
-                    <p className="section-note">Newest recipes appear first.</p>
+                    <p className="section-note">Możesz teraz zmieniać sposób porządkowania zapisanych przepisów.</p>
+                  </div>
+
+                  <div className="filter-row">
+                    <label className="field">
+                      <span>Sortuj po</span>
+                      <select value={recipeSortBy} onChange={(event) => setRecipeSortBy(event.target.value)}>
+                        <option value="created_at">Dacie dodania</option>
+                        <option value="name">Nazwie</option>
+                        <option value="meal_type">Typie posiłku</option>
+                        <option value="servings">Liczbie porcji</option>
+                      </select>
+                    </label>
+
+                    <label className="field">
+                      <span>Kierunek</span>
+                      <select value={recipeSortDirection} onChange={(event) => setRecipeSortDirection(event.target.value)}>
+                        <option value="desc">Malejąco</option>
+                        <option value="asc">Rosnąco</option>
+                      </select>
+                    </label>
                   </div>
 
                   {recipeLoadError ? <div className="banner error">{recipeLoadError}</div> : null}
                   {isLoadingRecipes ? <p className="helper">Loading recipes...</p> : null}
-                  {!isLoadingRecipes && recipes.length === 0 ? (
+                  {!isLoadingRecipes && sortedRecipes.length === 0 ? (
                     <p className="helper">No recipes yet. The first saved recipe will appear here.</p>
                   ) : null}
-
-                  <div className="card-list">
-                    {recipes.map((recipe) => (
-                      <article className="data-card" key={recipe.id}>
-                        <div className="data-card-header">
-                          <div>
-                            <h4>{recipe.name}</h4>
-                            <p className="helper">
-                              {formatMealType(recipe.meal_type)} • {recipe.servings} servings
-                            </p>
-                          </div>
-                          <span className="pill subtle">{formatDateTime(recipe.created_at)}</span>
-                        </div>
-
-                        {recipe.description ? (
-                          <p className="card-copy">{recipe.description}</p>
-                        ) : null}
-
-                        <div className="chip-list">
-                          {recipe.ingredients.map((ingredient) => (
-                            <span className="pill" key={ingredient.id}>
-                              {ingredient.quantity} {ingredient.unit_short_name} {ingredient.ingredient_name}
-                            </span>
-                          ))}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
+                  {!isLoadingRecipes && sortedRecipes.length > 0 ? <RecipeCards recipes={sortedRecipes} /> : null}
                 </section>
               </div>
-            </div>
-          ) : null}
 
-          {activeTab === "ingredients" ? (
-            <div className="tab-panel">
-              <div className="panel-grid compact">
+              <div className="panel-grid compact tab-subgrid">
                 <section className="panel-card">
                   <div className="section-heading">
                     <div>
@@ -835,9 +978,7 @@ function App() {
                         <input
                           type="text"
                           value={ingredientForm.name}
-                          onChange={(event) =>
-                            setIngredientForm((current) => ({ ...current, name: event.target.value }))
-                          }
+                          onChange={(event) => setIngredientForm((current) => ({ ...current, name: event.target.value }))}
                           placeholder="Tomatoes"
                         />
                       </label>
@@ -847,9 +988,7 @@ function App() {
                         <input
                           type="text"
                           value={ingredientForm.category}
-                          onChange={(event) =>
-                            setIngredientForm((current) => ({ ...current, category: event.target.value }))
-                          }
+                          onChange={(event) => setIngredientForm((current) => ({ ...current, category: event.target.value }))}
                           placeholder="Vegetables"
                         />
                       </label>
@@ -861,42 +1000,36 @@ function App() {
                       </button>
                     </div>
                   </form>
-                </section>
 
-                <section className="panel-card">
-                  <div className="section-heading">
-                    <div>
-                      <p className="section-kicker">Current list</p>
-                      <h3>Ingredients</h3>
+                  <div className="stack-section">
+                    <div className="section-heading">
+                      <div>
+                        <p className="section-kicker">Current list</p>
+                        <h3>Ingredients</h3>
+                      </div>
+                      <p className="section-note">Alphabetical order from the backend.</p>
                     </div>
-                    <p className="section-note">Alphabetical order from the backend.</p>
-                  </div>
 
-                  {ingredientLoadError ? <div className="banner error">{ingredientLoadError}</div> : null}
-                  {isLoadingIngredients ? <p className="helper">Loading ingredients...</p> : null}
-                  {!isLoadingIngredients && ingredients.length === 0 ? (
-                    <p className="helper">No ingredients have been added yet.</p>
-                  ) : null}
+                    {ingredientLoadError ? <div className="banner error">{ingredientLoadError}</div> : null}
+                    {isLoadingIngredients ? <p className="helper">Loading ingredients...</p> : null}
+                    {!isLoadingIngredients && ingredients.length === 0 ? (
+                      <p className="helper">No ingredients have been added yet.</p>
+                    ) : null}
 
-                  <div className="card-list">
-                    {ingredients.map((ingredient) => (
-                      <article className="data-card compact" key={ingredient.id}>
-                        <div className="data-card-header">
-                          <h4>{ingredient.name}</h4>
-                          {ingredient.category ? <span className="pill subtle">{ingredient.category}</span> : null}
-                        </div>
-                      </article>
-                    ))}
+                    <div className="card-list">
+                      {ingredients.map((ingredient) => (
+                        <article className="data-card compact" key={ingredient.id}>
+                          <div className="data-card-header">
+                            <h4>{ingredient.name}</h4>
+                            {ingredient.category ? <span className="pill subtle">{ingredient.category}</span> : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
                   </div>
                 </section>
-              </div>
-            </div>
-          ) : null}
 
-          {activeTab === "units" ? (
-            <div className="tab-panel">
-              <div className="panel-grid compact">
-                <section className="panel-card">
+                <section className="panel-card" ref={unitFormRef}>
                   <div className="section-heading">
                     <div>
                       <p className="section-kicker">Kitchen notation</p>
@@ -915,9 +1048,7 @@ function App() {
                         <input
                           type="text"
                           value={unitForm.name}
-                          onChange={(event) =>
-                            setUnitForm((current) => ({ ...current, name: event.target.value }))
-                          }
+                          onChange={(event) => setUnitForm((current) => ({ ...current, name: event.target.value }))}
                           placeholder="Tablespoon"
                         />
                       </label>
@@ -927,9 +1058,7 @@ function App() {
                         <input
                           type="text"
                           value={unitForm.short_name}
-                          onChange={(event) =>
-                            setUnitForm((current) => ({ ...current, short_name: event.target.value }))
-                          }
+                          onChange={(event) => setUnitForm((current) => ({ ...current, short_name: event.target.value }))}
                           placeholder="tbsp"
                         />
                       </label>
@@ -941,32 +1070,32 @@ function App() {
                       </button>
                     </div>
                   </form>
-                </section>
 
-                <section className="panel-card">
-                  <div className="section-heading">
-                    <div>
-                      <p className="section-kicker">Current list</p>
-                      <h3>Units</h3>
+                  <div className="stack-section">
+                    <div className="section-heading">
+                      <div>
+                        <p className="section-kicker">Current list</p>
+                        <h3>Units</h3>
+                      </div>
+                      <p className="section-note">Displayed with their full and short forms.</p>
                     </div>
-                    <p className="section-note">Displayed with their full and short forms.</p>
-                  </div>
 
-                  {unitLoadError ? <div className="banner error">{unitLoadError}</div> : null}
-                  {isLoadingUnits ? <p className="helper">Loading units...</p> : null}
-                  {!isLoadingUnits && units.length === 0 ? (
-                    <p className="helper">No units have been added yet.</p>
-                  ) : null}
+                    {unitLoadError ? <div className="banner error">{unitLoadError}</div> : null}
+                    {isLoadingUnits ? <p className="helper">Loading units...</p> : null}
+                    {!isLoadingUnits && units.length === 0 ? (
+                      <p className="helper">No units have been added yet.</p>
+                    ) : null}
 
-                  <div className="card-list">
-                    {units.map((unit) => (
-                      <article className="data-card compact" key={unit.id}>
-                        <div className="data-card-header">
-                          <h4>{unit.name}</h4>
-                          <span className="pill subtle">{unit.short_name}</span>
-                        </div>
-                      </article>
-                    ))}
+                    <div className="card-list">
+                      {units.map((unit) => (
+                        <article className="data-card compact" key={unit.id}>
+                          <div className="data-card-header">
+                            <h4>{unit.name}</h4>
+                            <span className="pill subtle">{unit.short_name}</span>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
                   </div>
                 </section>
               </div>
@@ -1048,9 +1177,7 @@ function App() {
                                 value={item.date}
                                 min={mealPlanForm.start_date || undefined}
                                 max={mealPlanForm.end_date || undefined}
-                                onChange={(event) =>
-                                  updateMealPlanItemRow(item.id, "date", event.target.value)
-                                }
+                                onChange={(event) => updateMealPlanItemRow(item.id, "date", event.target.value)}
                               />
                             </label>
 
@@ -1058,9 +1185,7 @@ function App() {
                               <span>Meal type</span>
                               <select
                                 value={item.meal_type}
-                                onChange={(event) =>
-                                  updateMealPlanItemRow(item.id, "meal_type", event.target.value)
-                                }
+                                onChange={(event) => updateMealPlanItemRow(item.id, "meal_type", event.target.value)}
                               >
                                 {mealTypes.map((mealType) => (
                                   <option key={mealType.value} value={mealType.value}>
@@ -1074,9 +1199,7 @@ function App() {
                               <span>Recipe</span>
                               <select
                                 value={item.recipe_id}
-                                onChange={(event) =>
-                                  updateMealPlanItemRow(item.id, "recipe_id", event.target.value)
-                                }
+                                onChange={(event) => updateMealPlanItemRow(item.id, "recipe_id", event.target.value)}
                               >
                                 <option value="">Select recipe</option>
                                 {recipes.map((recipe) => (
@@ -1087,11 +1210,7 @@ function App() {
                               </select>
                             </label>
 
-                            <button
-                              type="button"
-                              className="ghost-button"
-                              onClick={() => removeMealPlanItemRow(item.id)}
-                            >
+                            <button type="button" className="ghost-button" onClick={() => removeMealPlanItemRow(item.id)}>
                               Remove
                             </button>
                           </div>
@@ -1154,8 +1273,7 @@ function App() {
                             <div>
                               <h4>{selectedMealPlan.name}</h4>
                               <p className="helper">
-                                {formatDate(selectedMealPlan.start_date)} to{" "}
-                                {formatDate(selectedMealPlan.end_date)}
+                                {formatDate(selectedMealPlan.start_date)} to {formatDate(selectedMealPlan.end_date)}
                               </p>
                             </div>
                           </div>
