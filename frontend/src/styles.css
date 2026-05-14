@@ -31,6 +31,7 @@ body,
 body {
   margin: 0;
   min-width: 320px;
+  background: #f5f0e8;
 }
 
 button,
@@ -50,8 +51,6 @@ code {
 
 .page-shell {
   min-height: 100vh;
-  position: relative;
-  overflow: hidden;
 }
 
 .ambient {
@@ -76,14 +75,13 @@ code {
 }
 
 .app-layout {
-  position: relative;
-  z-index: 1;
-  max-width: 1360px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 40px 20px 64px;
-  display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-  gap: 24px;
+  padding: 24px 16px 40px;
+}
+
+.simple-layout {
+  display: block;
 }
 
 .hero-card,
@@ -536,15 +534,6 @@ code {
   margin-top: 20px;
 }
 
-@media (max-width: 1180px) {
-  .app-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .hero-card {
-    position: static;
-  }
-}
 
 @media (max-width: 960px) {
   .panel-grid,

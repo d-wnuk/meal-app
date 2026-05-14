@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { API_BASE_URL, request } from "./api";
+import { request } from "./api";
 
 const mealTypes = [
-  { value: "breakfast", label: "Breakfast" },
-  { value: "lunch", label: "Lunch" },
-  { value: "dinner", label: "Dinner" },
-  { value: "snack", label: "Snack" },
-  { value: "dessert", label: "Dessert" },
+  { value: "breakfast", label: "Sniadanie" },
+  { value: "lunch", label: "Drugie sniadanie" },
+  { value: "dinner", label: "Obiad" },
+  { value: "snack", label: "Przekaska" },
+  { value: "dessert", label: "Deser" },
 ];
 
 const tabs = [
@@ -61,7 +61,7 @@ function formatMealType(mealType) {
 
 function formatDate(dateString) {
   if (!dateString) {
-    return "No date";
+    return "Brak daty";
   }
 
   return new Intl.DateTimeFormat(undefined, {
@@ -73,7 +73,7 @@ function formatDate(dateString) {
 
 function formatDateTime(dateString) {
   if (!dateString) {
-    return "Unknown";
+    return "Nieznane";
   }
 
   return new Intl.DateTimeFormat(undefined, {
@@ -157,7 +157,7 @@ function RecipeCards({ recipes }) {
             <div>
               <h4>{recipe.name}</h4>
               <p className="helper">
-                {formatMealType(recipe.meal_type)} • {recipe.servings} servings
+                {formatMealType(recipe.meal_type)} • {recipe.servings} porcje
               </p>
             </div>
             <span className="pill subtle">{formatDateTime(recipe.created_at)}</span>
@@ -204,15 +204,12 @@ function App() {
   const [isLoadingRecipes, setIsLoadingRecipes] = useState(true);
   const [isLoadingMealPlans, setIsLoadingMealPlans] = useState(true);
   const [isLoadingMealPlanDetail, setIsLoadingMealPlanDetail] = useState(false);
-  const [isCheckingApiHealth, setIsCheckingApiHealth] = useState(true);
 
   const [recipeLoadError, setRecipeLoadError] = useState("");
   const [ingredientLoadError, setIngredientLoadError] = useState("");
   const [unitLoadError, setUnitLoadError] = useState("");
   const [mealPlanLoadError, setMealPlanLoadError] = useState("");
   const [mealPlanDetailError, setMealPlanDetailError] = useState("");
-  const [apiHealthStatus, setApiHealthStatus] = useState("unknown");
-  const [apiHealthMessage, setApiHealthMessage] = useState("");
 
   const [recipeSubmitError, setRecipeSubmitError] = useState("");
   const [ingredientSubmitError, setIngredientSubmitError] = useState("");
@@ -229,28 +226,6 @@ function App() {
   const [isSubmittingUnit, setIsSubmittingUnit] = useState(false);
   const [isSubmittingMealPlan, setIsSubmittingMealPlan] = useState(false);
 
-  const loadApiHealth = async () => {
-    setIsCheckingApiHealth(true);
-
-    try {
-      const data = await request("/health");
-      if (data?.status === "ok") {
-        setApiHealthStatus("healthy");
-        setApiHealthMessage("Backend connection is healthy.");
-      } else {
-        setApiHealthStatus("warning");
-        setApiHealthMessage("Backend responded, but the health check returned an unexpected payload.");
-      }
-    } catch (error) {
-      setApiHealthStatus("offline");
-      setApiHealthMessage(
-        error.message || "Backend is unreachable. Check the API container or local server.",
-      );
-    } finally {
-      setIsCheckingApiHealth(false);
-    }
-  };
-
   const loadIngredients = async () => {
     setIsLoadingIngredients(true);
     setIngredientLoadError("");
@@ -259,7 +234,7 @@ function App() {
       const data = await request("/ingredients");
       setIngredients(data);
     } catch (error) {
-      setIngredientLoadError(error.message || "Could not load ingredients.");
+      setIngredientLoadError(error.message || "Nie udalo sie zaladowac skladnikow.");
     } finally {
       setIsLoadingIngredients(false);
     }
@@ -273,7 +248,7 @@ function App() {
       const data = await request("/units");
       setUnits(data);
     } catch (error) {
-      setUnitLoadError(error.message || "Could not load units.");
+      setUnitLoadError(error.message || "Nie udalo sie zaladowac jednostek.");
     } finally {
       setIsLoadingUnits(false);
     }
@@ -287,7 +262,7 @@ function App() {
       const data = await request("/recipes");
       setRecipes(data);
     } catch (error) {
-      setRecipeLoadError(error.message || "Could not load recipes.");
+      setRecipeLoadError(error.message || "Nie udalo sie zaladowac przepisow.");
     } finally {
       setIsLoadingRecipes(false);
     }
@@ -308,7 +283,7 @@ function App() {
         return data.some((mealPlan) => mealPlan.id === current) ? current : data[0].id;
       });
     } catch (error) {
-      setMealPlanLoadError(error.message || "Could not load meal plans.");
+      setMealPlanLoadError(error.message || "Nie udalo sie zaladowac planow posilkow.");
     } finally {
       setIsLoadingMealPlans(false);
     }
@@ -329,14 +304,13 @@ function App() {
       setSelectedMealPlan(data);
     } catch (error) {
       setSelectedMealPlan(null);
-      setMealPlanDetailError(error.message || "Could not load meal plan details.");
+      setMealPlanDetailError(error.message || "Nie udalo sie zaladowac szczegolow planu posilkow.");
     } finally {
       setIsLoadingMealPlanDetail(false);
     }
   };
 
   useEffect(() => {
-    loadApiHealth();
     loadIngredients();
     loadUnits();
     loadRecipes();
@@ -431,17 +405,17 @@ function App() {
     );
 
     if (!recipeForm.name.trim()) {
-      setRecipeSubmitError("Recipe name is required.");
+      setRecipeSubmitError("Nazwa przepisu jest wymagana.");
       return;
     }
 
     if (Number(recipeForm.servings) < 1) {
-      setRecipeSubmitError("Servings must be at least 1.");
+      setRecipeSubmitError("Liczba porcji musi byc co najmniej 1.");
       return;
     }
 
     if (hasEmptyIngredient) {
-      setRecipeSubmitError("Each ingredient row needs an ingredient, quantity, and unit.");
+      setRecipeSubmitError("Kazdy wiersz skladnika musi miec skladnik, ilosc i jednostke.");
       return;
     }
 
@@ -465,11 +439,11 @@ function App() {
         body: JSON.stringify(payload),
       });
 
-      setRecipeSuccessMessage(`Recipe saved successfully with ID ${data.id}.`);
+      setRecipeSuccessMessage(`Przepis zapisano pomyslnie. ID: ${data.id}.`);
       setRecipeForm(createInitialRecipeForm());
       await loadRecipes();
     } catch (error) {
-      setRecipeSubmitError(error.message || "Something went wrong while saving the recipe.");
+      setRecipeSubmitError(error.message || "Wystapil blad podczas zapisywania przepisu.");
     } finally {
       setIsSubmittingRecipe(false);
     }
@@ -481,7 +455,7 @@ function App() {
     setIngredientSuccessMessage("");
 
     if (!ingredientForm.name.trim()) {
-      setIngredientSubmitError("Ingredient name is required.");
+      setIngredientSubmitError("Nazwa skladnika jest wymagana.");
       return;
     }
 
@@ -496,11 +470,11 @@ function App() {
         }),
       });
 
-      setIngredientSuccessMessage(`Ingredient "${data.name}" added.`);
+      setIngredientSuccessMessage(`Dodano skladnik: "${data.name}".`);
       setIngredientForm(createInitialIngredientForm());
       await loadIngredients();
     } catch (error) {
-      setIngredientSubmitError(error.message || "Could not save the ingredient.");
+      setIngredientSubmitError(error.message || "Nie udalo sie zapisac skladnika.");
     } finally {
       setIsSubmittingIngredient(false);
     }
@@ -512,7 +486,7 @@ function App() {
     setUnitSuccessMessage("");
 
     if (!unitForm.name.trim() || !unitForm.short_name.trim()) {
-      setUnitSubmitError("Unit name and short name are required.");
+      setUnitSubmitError("Nazwa jednostki i skrot sa wymagane.");
       return;
     }
 
@@ -527,11 +501,11 @@ function App() {
         }),
       });
 
-      setUnitSuccessMessage(`Unit "${data.name}" added.`);
+      setUnitSuccessMessage(`Dodano jednostke: "${data.name}".`);
       setUnitForm(createInitialUnitForm());
       await loadUnits();
     } catch (error) {
-      setUnitSubmitError(error.message || "Could not save the unit.");
+      setUnitSubmitError(error.message || "Nie udalo sie zapisac jednostki.");
     } finally {
       setIsSubmittingUnit(false);
     }
@@ -545,22 +519,22 @@ function App() {
     const hasEmptyItem = mealPlanForm.items.some((item) => isBlank(item.date) || isBlank(item.recipe_id));
 
     if (!mealPlanForm.name.trim()) {
-      setMealPlanSubmitError("Meal plan name is required.");
+      setMealPlanSubmitError("Nazwa planu posilkow jest wymagana.");
       return;
     }
 
     if (!mealPlanForm.start_date || !mealPlanForm.end_date) {
-      setMealPlanSubmitError("Meal plan start and end dates are required.");
+      setMealPlanSubmitError("Data poczatkowa i koncowa planu sa wymagane.");
       return;
     }
 
     if (mealPlanForm.start_date > mealPlanForm.end_date) {
-      setMealPlanSubmitError("Start date must be on or before end date.");
+      setMealPlanSubmitError("Data poczatkowa musi byc wczesniejsza lub rowna koncowej.");
       return;
     }
 
     if (hasEmptyItem) {
-      setMealPlanSubmitError("Each meal slot needs a date and recipe.");
+      setMealPlanSubmitError("Kazdy slot posilku musi miec date i przepis.");
       return;
     }
 
@@ -583,13 +557,13 @@ function App() {
         body: JSON.stringify(payload),
       });
 
-      setMealPlanSuccessMessage(`Meal plan "${data.name}" created.`);
+      setMealPlanSuccessMessage(`Utworzono plan posilkow: "${data.name}".`);
       setMealPlanForm(createInitialMealPlanForm());
       setSelectedMealPlanId(data.id);
       setSelectedMealPlan(data);
       await loadMealPlans();
     } catch (error) {
-      setMealPlanSubmitError(error.message || "Could not create the meal plan.");
+      setMealPlanSubmitError(error.message || "Nie udalo sie utworzyc planu posilkow.");
     } finally {
       setIsSubmittingMealPlan(false);
     }
@@ -626,40 +600,9 @@ function App() {
 
   return (
     <div className="page-shell">
-      <div className="ambient ambient-left" />
-      <div className="ambient ambient-right" />
-
-      <main className="app-layout">
-        <section className="hero-card">
-          <p className="eyebrow">Kitchen Studio</p>
-          <h1>Nowy układ pracy z przepisami, jednostkami i planem posiłków.</h1>
-          <p className="hero-copy">
-            Główna strona została uproszczona do trzech głównych zakładek, żeby łatwiej było
-            przełączać się między wyszukiwaniem, tworzeniem przepisów i planowaniem.
-          </p>
-
-          <div className="hero-pills">
-            <span>3 główne zakładki</span>
-            <span>{recipes.length} przepisów</span>
-            <span>{units.length} jednostek</span>
-          </div>
-
-          <div className="hero-meta">
-            <span>API target</span>
-            <code>{API_BASE_URL}</code>
-          </div>
-        </section>
-
+      <main className="app-layout simple-layout">
         <section className="workspace-card">
-          <div className="section-heading">
-            <div>
-              <p className="section-kicker">Workspace</p>
-              <h2>Meal app control center</h2>
-            </div>
-            <p className="section-note">Switch between the main areas without leaving the page.</p>
-          </div>
-
-          <div className="tab-row" role="tablist" aria-label="Meal app sections">
+          <div className="tab-row" role="tablist" aria-label="Sekcje aplikacji">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -672,103 +615,49 @@ function App() {
             ))}
           </div>
 
-          <div
-            className={`health-banner ${
-              apiHealthStatus === "healthy"
-                ? "success"
-                : apiHealthStatus === "offline"
-                  ? "error"
-                  : "warning"
-            }`}
-          >
-            <div className="health-banner-copy">
-              <strong>
-                {isCheckingApiHealth
-                  ? "Checking backend connection..."
-                  : apiHealthStatus === "healthy"
-                    ? "Backend connected"
-                    : apiHealthStatus === "offline"
-                      ? "Backend unavailable"
-                      : "Backend status needs attention"}
-              </strong>
-              <span>{apiHealthMessage || "Running API health check."}</span>
-            </div>
-            <button type="button" className="ghost-button" onClick={loadApiHealth}>
-              Retry health check
-            </button>
-          </div>
-
           {activeTab === "recipe-search" ? (
             <div className="tab-panel">
-              <div className="panel-grid">
-                <section className="panel-card">
-                  <div className="section-heading">
-                    <div>
-                      <p className="section-kicker">Szybkie akcje</p>
-                      <h3>Wyszukiwarka przepisów</h3>
-                    </div>
-                    <p className="section-note">Tutaj zostawiłem skróty do najczęściej używanych akcji.</p>
-                  </div>
-
+              <section className="panel-card">
+                <div className="section-heading">
+                  <h3>Wyszukiwarka przepisów</h3>
                   <div className="action-list">
-                    <button type="button" className="secondary-button action-button" onClick={() => openCreationSection("recipe")}>
+                    <button
+                      type="button"
+                      className="secondary-button action-button"
+                      onClick={() => openCreationSection("recipe")}
+                    >
                       Dodaj przepis
                     </button>
-                    <button type="button" className="ghost-button action-button" onClick={() => openCreationSection("unit")}>
+                    <button
+                      type="button"
+                      className="ghost-button action-button"
+                      onClick={() => openCreationSection("unit")}
+                    >
                       Dodaj jednostkę
                     </button>
                   </div>
+                </div>
 
-                  <div className="stack-section">
-                    <div className="section-heading">
-                      <div>
-                        <p className="section-kicker">Podsumowanie</p>
-                        <h3>Stan biblioteki</h3>
-                      </div>
-                    </div>
+                <div className="search-row">
+                  <label className="field">
+                    <span>Szukaj przepisu</span>
+                    <input
+                      type="search"
+                      value={recipeSearchTerm}
+                      onChange={(event) => setRecipeSearchTerm(event.target.value)}
+                      placeholder="np. pasta, obiad, pomidor"
+                    />
+                  </label>
+                </div>
 
-                    <div className="chip-list">
-                      <span className="pill">Przepisy: {recipes.length}</span>
-                      <span className="pill">Składniki: {ingredients.length}</span>
-                      <span className="pill">Jednostki: {units.length}</span>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="panel-card">
-                  <div className="section-heading">
-                    <div>
-                      <p className="section-kicker">Biblioteka</p>
-                      <h3>Zapisane przepisy</h3>
-                    </div>
-                    <p className="section-note">Lista przepisów została pod ręką w zakładce wyszukiwarki.</p>
-                  </div>
-
-                  <div className="search-row">
-                    <label className="field">
-                      <span>Szukaj przepisu</span>
-                      <input
-                        type="search"
-                        value={recipeSearchTerm}
-                        onChange={(event) => setRecipeSearchTerm(event.target.value)}
-                        placeholder="np. pasta, dinner, pomidor"
-                      />
-                    </label>
-                  </div>
-
-                  {recipeLoadError ? <div className="banner error">{recipeLoadError}</div> : null}
-                  {isLoadingRecipes ? <p className="helper">Loading recipes...</p> : null}
-                  {!isLoadingRecipes && recipes.length === 0 ? (
-                    <p className="helper">No recipes yet. The first saved recipe will appear here.</p>
-                  ) : null}
-                  {!isLoadingRecipes && recipes.length > 0 && filteredRecipes.length === 0 ? (
-                    <p className="helper">Nie znaleziono przepisów pasujących do wyszukiwania.</p>
-                  ) : null}
-                  {!isLoadingRecipes && filteredRecipes.length > 0 ? (
-                    <RecipeCards recipes={filteredRecipes} />
-                  ) : null}
-                </section>
-              </div>
+                {recipeLoadError ? <div className="banner error">{recipeLoadError}</div> : null}
+                {isLoadingRecipes ? <p className="helper">Ladowanie przepisow...</p> : null}
+                {!isLoadingRecipes && recipes.length === 0 ? <p className="helper">Brak przepisow.</p> : null}
+                {!isLoadingRecipes && recipes.length > 0 && filteredRecipes.length === 0 ? (
+                  <p className="helper">Nie znaleziono przepisow pasujacych do wyszukiwania.</p>
+                ) : null}
+                {!isLoadingRecipes && filteredRecipes.length > 0 ? <RecipeCards recipes={filteredRecipes} /> : null}
+              </section>
             </div>
           ) : null}
 
@@ -777,11 +666,10 @@ function App() {
               <div className="panel-grid">
                 <section className="panel-card" ref={recipeFormRef}>
                   <div className="section-heading">
-                    <div>
-                      <p className="section-kicker">Nowy przepis</p>
-                      <h3>Tworzenie przepisów</h3>
-                    </div>
-                    <p className="section-note">Dodaj przepis razem z listą składników i jednostkami.</p>
+                    <h3>Tworzenie przepisu</h3>
+                    <button type="button" className="secondary-button" onClick={addRecipeIngredientRow}>
+                      Dodaj skladnik
+                    </button>
                   </div>
 
                   {ingredientLoadError ? <div className="banner error">{ingredientLoadError}</div> : null}
@@ -792,17 +680,17 @@ function App() {
                   <form onSubmit={handleRecipeSubmit}>
                     <div className="form-grid">
                       <label className="field field-wide">
-                        <span>Recipe name</span>
+                        <span>Nazwa przepisu</span>
                         <input
                           type="text"
                           value={recipeForm.name}
                           onChange={(event) => updateRecipeField("name", event.target.value)}
-                          placeholder="Creamy tomato pasta"
+                          placeholder="Makaron pomidorowy"
                         />
                       </label>
 
                       <label className="field">
-                        <span>Meal type</span>
+                        <span>Typ posilku</span>
                         <select
                           value={recipeForm.meal_type}
                           onChange={(event) => updateRecipeField("meal_type", event.target.value)}
@@ -816,7 +704,7 @@ function App() {
                       </label>
 
                       <label className="field">
-                        <span>Servings</span>
+                        <span>Liczba porcji</span>
                         <input
                           type="number"
                           min="1"
@@ -826,95 +714,83 @@ function App() {
                       </label>
 
                       <label className="field field-wide">
-                        <span>Description</span>
+                        <span>Opis</span>
                         <textarea
                           rows="4"
                           value={recipeForm.description}
                           onChange={(event) => updateRecipeField("description", event.target.value)}
-                          placeholder="Short notes, flavor profile, or cooking instructions."
+                          placeholder="Krotkie notatki lub instrukcje."
                         />
                       </label>
                     </div>
 
-                    <div className="stack-section">
-                      <div className="section-heading">
-                        <div>
-                          <p className="section-kicker">Ingredients</p>
-                          <h3>What goes into it?</h3>
+                    {isLoadingIngredients || isLoadingUnits ? (
+                      <p className="helper stack-section">Ladowanie skladnikow i jednostek...</p>
+                    ) : null}
+                    {!isLoadingIngredients && ingredients.length === 0 ? (
+                      <p className="helper stack-section">Brak skladnikow. Dodaj je ponizej.</p>
+                    ) : null}
+                    {!isLoadingUnits && units.length === 0 ? (
+                      <p className="helper stack-section">Brak jednostek. Dodaj je ponizej.</p>
+                    ) : null}
+
+                    <div className="row-list stack-section">
+                      {recipeForm.ingredients.map((row, index) => (
+                        <div className="editable-row" key={row.id}>
+                          <div className="row-title">Skladnik {index + 1}</div>
+
+                          <label className="field">
+                            <span>Skladnik</span>
+                            <select
+                              value={row.ingredient_id}
+                              onChange={(event) => updateRecipeIngredientRow(row.id, "ingredient_id", event.target.value)}
+                            >
+                              <option value="">Wybierz skladnik</option>
+                              {ingredients.map((ingredient) => (
+                                <option key={ingredient.id} value={ingredient.id}>
+                                  {ingredient.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="field">
+                            <span>Ilosc</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={row.quantity}
+                              onChange={(event) => updateRecipeIngredientRow(row.id, "quantity", event.target.value)}
+                              placeholder="2"
+                            />
+                          </label>
+
+                          <label className="field">
+                            <span>Jednostka</span>
+                            <select
+                              value={row.unit_id}
+                              onChange={(event) => updateRecipeIngredientRow(row.id, "unit_id", event.target.value)}
+                            >
+                              <option value="">Wybierz jednostke</option>
+                              {units.map((unit) => (
+                                <option key={unit.id} value={unit.id}>
+                                  {unit.name} ({unit.short_name})
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <button type="button" className="ghost-button" onClick={() => removeRecipeIngredientRow(row.id)}>
+                            Usun
+                          </button>
                         </div>
-                        <button type="button" className="secondary-button" onClick={addRecipeIngredientRow}>
-                          Add ingredient
-                        </button>
-                      </div>
-
-                      {isLoadingIngredients || isLoadingUnits ? (
-                        <p className="helper">Loading ingredient and unit options...</p>
-                      ) : null}
-                      {!isLoadingIngredients && ingredients.length === 0 ? (
-                        <p className="helper">No ingredients found yet. Add some below first.</p>
-                      ) : null}
-                      {!isLoadingUnits && units.length === 0 ? (
-                        <p className="helper">No units found yet. Add some below first.</p>
-                      ) : null}
-
-                      <div className="row-list">
-                        {recipeForm.ingredients.map((row, index) => (
-                          <div className="editable-row" key={row.id}>
-                            <div className="row-title">Ingredient {index + 1}</div>
-
-                            <label className="field">
-                              <span>Ingredient</span>
-                              <select
-                                value={row.ingredient_id}
-                                onChange={(event) => updateRecipeIngredientRow(row.id, "ingredient_id", event.target.value)}
-                              >
-                                <option value="">Select ingredient</option>
-                                {ingredients.map((ingredient) => (
-                                  <option key={ingredient.id} value={ingredient.id}>
-                                    {ingredient.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-
-                            <label className="field">
-                              <span>Quantity</span>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={row.quantity}
-                                onChange={(event) => updateRecipeIngredientRow(row.id, "quantity", event.target.value)}
-                                placeholder="2"
-                              />
-                            </label>
-
-                            <label className="field">
-                              <span>Unit</span>
-                              <select
-                                value={row.unit_id}
-                                onChange={(event) => updateRecipeIngredientRow(row.id, "unit_id", event.target.value)}
-                              >
-                                <option value="">Select unit</option>
-                                {units.map((unit) => (
-                                  <option key={unit.id} value={unit.id}>
-                                    {unit.name} ({unit.short_name})
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-
-                            <button type="button" className="ghost-button" onClick={() => removeRecipeIngredientRow(row.id)}>
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                      ))}
                     </div>
 
                     <div className="actions">
                       <button className="primary-button" type="submit" disabled={!recipesTabCanSubmit}>
-                        {isSubmittingRecipe ? "Saving recipe..." : "Save recipe"}
+                        {isSubmittingRecipe ? "Zapisywanie przepisu..." : "Zapisz przepis"}
                       </button>
                     </div>
                   </form>
@@ -922,11 +798,7 @@ function App() {
 
                 <section className="panel-card">
                   <div className="section-heading">
-                    <div>
-                      <p className="section-kicker">Sortowanie</p>
-                      <h3>Filtry dla listy przepisów</h3>
-                    </div>
-                    <p className="section-note">Możesz teraz zmieniać sposób porządkowania zapisanych przepisów.</p>
+                    <h3>Lista przepisow</h3>
                   </div>
 
                   <div className="filter-row">
@@ -950,10 +822,8 @@ function App() {
                   </div>
 
                   {recipeLoadError ? <div className="banner error">{recipeLoadError}</div> : null}
-                  {isLoadingRecipes ? <p className="helper">Loading recipes...</p> : null}
-                  {!isLoadingRecipes && sortedRecipes.length === 0 ? (
-                    <p className="helper">No recipes yet. The first saved recipe will appear here.</p>
-                  ) : null}
+                  {isLoadingRecipes ? <p className="helper">Ladowanie przepisow...</p> : null}
+                  {!isLoadingRecipes && sortedRecipes.length === 0 ? <p className="helper">Brak przepisow.</p> : null}
                   {!isLoadingRecipes && sortedRecipes.length > 0 ? <RecipeCards recipes={sortedRecipes} /> : null}
                 </section>
               </div>
@@ -961,11 +831,7 @@ function App() {
               <div className="panel-grid compact tab-subgrid">
                 <section className="panel-card">
                   <div className="section-heading">
-                    <div>
-                      <p className="section-kicker">Pantry setup</p>
-                      <h3>Add an ingredient</h3>
-                    </div>
-                    <p className="section-note">Saved ingredients become available in recipe forms.</p>
+                    <h3>Skladniki</h3>
                   </div>
 
                   {ingredientSubmitError ? <div className="banner error">{ingredientSubmitError}</div> : null}
@@ -974,68 +840,52 @@ function App() {
                   <form onSubmit={handleIngredientSubmit}>
                     <div className="form-grid single-column">
                       <label className="field">
-                        <span>Name</span>
+                        <span>Nazwa</span>
                         <input
                           type="text"
                           value={ingredientForm.name}
                           onChange={(event) => setIngredientForm((current) => ({ ...current, name: event.target.value }))}
-                          placeholder="Tomatoes"
+                          placeholder="Pomidory"
                         />
                       </label>
 
                       <label className="field">
-                        <span>Category</span>
+                        <span>Kategoria</span>
                         <input
                           type="text"
                           value={ingredientForm.category}
                           onChange={(event) => setIngredientForm((current) => ({ ...current, category: event.target.value }))}
-                          placeholder="Vegetables"
+                          placeholder="Warzywa"
                         />
                       </label>
                     </div>
 
                     <div className="actions">
                       <button className="primary-button" type="submit" disabled={isSubmittingIngredient}>
-                        {isSubmittingIngredient ? "Saving ingredient..." : "Save ingredient"}
+                        {isSubmittingIngredient ? "Zapisywanie skladnika..." : "Zapisz skladnik"}
                       </button>
                     </div>
                   </form>
 
-                  <div className="stack-section">
-                    <div className="section-heading">
-                      <div>
-                        <p className="section-kicker">Current list</p>
-                        <h3>Ingredients</h3>
-                      </div>
-                      <p className="section-note">Alphabetical order from the backend.</p>
-                    </div>
+                  {ingredientLoadError ? <div className="banner error">{ingredientLoadError}</div> : null}
+                  {isLoadingIngredients ? <p className="helper">Ladowanie skladnikow...</p> : null}
+                  {!isLoadingIngredients && ingredients.length === 0 ? <p className="helper">Nie dodano jeszcze skladnikow.</p> : null}
 
-                    {ingredientLoadError ? <div className="banner error">{ingredientLoadError}</div> : null}
-                    {isLoadingIngredients ? <p className="helper">Loading ingredients...</p> : null}
-                    {!isLoadingIngredients && ingredients.length === 0 ? (
-                      <p className="helper">No ingredients have been added yet.</p>
-                    ) : null}
-
-                    <div className="card-list">
-                      {ingredients.map((ingredient) => (
-                        <article className="data-card compact" key={ingredient.id}>
-                          <div className="data-card-header">
-                            <h4>{ingredient.name}</h4>
-                            {ingredient.category ? <span className="pill subtle">{ingredient.category}</span> : null}
-                          </div>
-                        </article>
-                      ))}
-                    </div>
+                  <div className="card-list">
+                    {ingredients.map((ingredient) => (
+                      <article className="data-card compact" key={ingredient.id}>
+                        <div className="data-card-header">
+                          <h4>{ingredient.name}</h4>
+                          {ingredient.category ? <span className="pill subtle">{ingredient.category}</span> : null}
+                        </div>
+                      </article>
+                    ))}
                   </div>
                 </section>
 
                 <section className="panel-card" ref={unitFormRef}>
                   <div className="section-heading">
-                    <div>
-                      <p className="section-kicker">Kitchen notation</p>
-                      <h3>Add a unit</h3>
-                    </div>
-                    <p className="section-note">Units are shared across all recipe ingredient rows.</p>
+                    <h3>Jednostki</h3>
                   </div>
 
                   {unitSubmitError ? <div className="banner error">{unitSubmitError}</div> : null}
@@ -1044,17 +894,17 @@ function App() {
                   <form onSubmit={handleUnitSubmit}>
                     <div className="form-grid single-column">
                       <label className="field">
-                        <span>Name</span>
+                        <span>Nazwa</span>
                         <input
                           type="text"
                           value={unitForm.name}
                           onChange={(event) => setUnitForm((current) => ({ ...current, name: event.target.value }))}
-                          placeholder="Tablespoon"
+                          placeholder="Lyzka"
                         />
                       </label>
 
                       <label className="field">
-                        <span>Short name</span>
+                        <span>Skrot</span>
                         <input
                           type="text"
                           value={unitForm.short_name}
@@ -1066,36 +916,24 @@ function App() {
 
                     <div className="actions">
                       <button className="primary-button" type="submit" disabled={isSubmittingUnit}>
-                        {isSubmittingUnit ? "Saving unit..." : "Save unit"}
+                        {isSubmittingUnit ? "Zapisywanie jednostki..." : "Zapisz jednostke"}
                       </button>
                     </div>
                   </form>
 
-                  <div className="stack-section">
-                    <div className="section-heading">
-                      <div>
-                        <p className="section-kicker">Current list</p>
-                        <h3>Units</h3>
-                      </div>
-                      <p className="section-note">Displayed with their full and short forms.</p>
-                    </div>
+                  {unitLoadError ? <div className="banner error">{unitLoadError}</div> : null}
+                  {isLoadingUnits ? <p className="helper">Ladowanie jednostek...</p> : null}
+                  {!isLoadingUnits && units.length === 0 ? <p className="helper">Nie dodano jeszcze jednostek.</p> : null}
 
-                    {unitLoadError ? <div className="banner error">{unitLoadError}</div> : null}
-                    {isLoadingUnits ? <p className="helper">Loading units...</p> : null}
-                    {!isLoadingUnits && units.length === 0 ? (
-                      <p className="helper">No units have been added yet.</p>
-                    ) : null}
-
-                    <div className="card-list">
-                      {units.map((unit) => (
-                        <article className="data-card compact" key={unit.id}>
-                          <div className="data-card-header">
-                            <h4>{unit.name}</h4>
-                            <span className="pill subtle">{unit.short_name}</span>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
+                  <div className="card-list">
+                    {units.map((unit) => (
+                      <article className="data-card compact" key={unit.id}>
+                        <div className="data-card-header">
+                          <h4>{unit.name}</h4>
+                          <span className="pill subtle">{unit.short_name}</span>
+                        </div>
+                      </article>
+                    ))}
                   </div>
                 </section>
               </div>
@@ -1107,11 +945,10 @@ function App() {
               <div className="panel-grid">
                 <section className="panel-card">
                   <div className="section-heading">
-                    <div>
-                      <p className="section-kicker">Weekly setup</p>
-                      <h3>Create a meal plan</h3>
-                    </div>
-                    <p className="section-note">Assign recipes to dates and meal slots.</p>
+                    <h3>Tworzenie planu</h3>
+                    <button type="button" className="secondary-button" onClick={addMealPlanItemRow}>
+                      Dodaj posilek
+                    </button>
                   </div>
 
                   {mealPlanSubmitError ? <div className="banner error">{mealPlanSubmitError}</div> : null}
@@ -1121,17 +958,17 @@ function App() {
                   <form onSubmit={handleMealPlanSubmit}>
                     <div className="form-grid">
                       <label className="field field-wide">
-                        <span>Name</span>
+                        <span>Nazwa</span>
                         <input
                           type="text"
                           value={mealPlanForm.name}
                           onChange={(event) => updateMealPlanField("name", event.target.value)}
-                          placeholder="Weeknight dinners"
+                          placeholder="Obiady na dni robocze"
                         />
                       </label>
 
                       <label className="field">
-                        <span>Start date</span>
+                        <span>Data poczatkowa</span>
                         <input
                           type="date"
                           value={mealPlanForm.start_date}
@@ -1140,7 +977,7 @@ function App() {
                       </label>
 
                       <label className="field">
-                        <span>End date</span>
+                        <span>Data koncowa</span>
                         <input
                           type="date"
                           value={mealPlanForm.end_date}
@@ -1149,78 +986,66 @@ function App() {
                       </label>
                     </div>
 
-                    <div className="stack-section">
-                      <div className="section-heading">
-                        <div>
-                          <p className="section-kicker">Scheduled meals</p>
-                          <h3>Plan the slots</h3>
+                    {isLoadingRecipes ? <p className="helper stack-section">Ladowanie listy przepisow...</p> : null}
+                    {!isLoadingRecipes && recipes.length === 0 ? (
+                      <p className="helper stack-section">Utworz co najmniej jeden przepis przed planowaniem posilkow.</p>
+                    ) : null}
+
+                    <div className="row-list stack-section">
+                      {mealPlanForm.items.map((item, index) => (
+                        <div className="editable-row meal-plan-row" key={item.id}>
+                          <div className="row-title">Posilek {index + 1}</div>
+
+                          <label className="field">
+                            <span>Data</span>
+                            <input
+                              type="date"
+                              value={item.date}
+                              min={mealPlanForm.start_date || undefined}
+                              max={mealPlanForm.end_date || undefined}
+                              onChange={(event) => updateMealPlanItemRow(item.id, "date", event.target.value)}
+                            />
+                          </label>
+
+                          <label className="field">
+                            <span>Typ posilku</span>
+                            <select
+                              value={item.meal_type}
+                              onChange={(event) => updateMealPlanItemRow(item.id, "meal_type", event.target.value)}
+                            >
+                              {mealTypes.map((mealType) => (
+                                <option key={mealType.value} value={mealType.value}>
+                                  {mealType.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="field">
+                            <span>Przepis</span>
+                            <select
+                              value={item.recipe_id}
+                              onChange={(event) => updateMealPlanItemRow(item.id, "recipe_id", event.target.value)}
+                            >
+                              <option value="">Wybierz przepis</option>
+                              {recipes.map((recipe) => (
+                                <option key={recipe.id} value={recipe.id}>
+                                  {recipe.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <button type="button" className="ghost-button" onClick={() => removeMealPlanItemRow(item.id)}>
+                            Usun
+                          </button>
                         </div>
-                        <button type="button" className="secondary-button" onClick={addMealPlanItemRow}>
-                          Add slot
-                        </button>
-                      </div>
-
-                      {isLoadingRecipes ? <p className="helper">Loading recipe options...</p> : null}
-                      {!isLoadingRecipes && recipes.length === 0 ? (
-                        <p className="helper">Create at least one recipe before scheduling a meal plan.</p>
-                      ) : null}
-
-                      <div className="row-list">
-                        {mealPlanForm.items.map((item, index) => (
-                          <div className="editable-row meal-plan-row" key={item.id}>
-                            <div className="row-title">Meal slot {index + 1}</div>
-
-                            <label className="field">
-                              <span>Date</span>
-                              <input
-                                type="date"
-                                value={item.date}
-                                min={mealPlanForm.start_date || undefined}
-                                max={mealPlanForm.end_date || undefined}
-                                onChange={(event) => updateMealPlanItemRow(item.id, "date", event.target.value)}
-                              />
-                            </label>
-
-                            <label className="field">
-                              <span>Meal type</span>
-                              <select
-                                value={item.meal_type}
-                                onChange={(event) => updateMealPlanItemRow(item.id, "meal_type", event.target.value)}
-                              >
-                                {mealTypes.map((mealType) => (
-                                  <option key={mealType.value} value={mealType.value}>
-                                    {mealType.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-
-                            <label className="field">
-                              <span>Recipe</span>
-                              <select
-                                value={item.recipe_id}
-                                onChange={(event) => updateMealPlanItemRow(item.id, "recipe_id", event.target.value)}
-                              >
-                                <option value="">Select recipe</option>
-                                {recipes.map((recipe) => (
-                                  <option key={recipe.id} value={recipe.id}>
-                                    {recipe.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-
-                            <button type="button" className="ghost-button" onClick={() => removeMealPlanItemRow(item.id)}>
-                              Remove
-                            </button>
-                          </div>
-                        ))}
-                      </div>
+                      ))}
                     </div>
 
                     <div className="actions">
                       <button className="primary-button" type="submit" disabled={!mealPlansTabCanSubmit}>
-                        {isSubmittingMealPlan ? "Creating meal plan..." : "Create meal plan"}
+                        {isSubmittingMealPlan ? "Tworzenie planu posilkow..." : "Utworz plan posilkow"}
                       </button>
                     </div>
                   </form>
@@ -1228,11 +1053,7 @@ function App() {
 
                 <section className="panel-card">
                   <div className="section-heading">
-                    <div>
-                      <p className="section-kicker">Calendar</p>
-                      <h3>Saved meal plans</h3>
-                    </div>
-                    <p className="section-note">Select a plan to inspect its scheduled meals.</p>
+                    <h3>Zapisane plany</h3>
                   </div>
 
                   {mealPlanLoadError ? <div className="banner error">{mealPlanLoadError}</div> : null}
@@ -1240,10 +1061,8 @@ function App() {
 
                   <div className="split-content">
                     <div className="selection-list">
-                      {isLoadingMealPlans ? <p className="helper">Loading meal plans...</p> : null}
-                      {!isLoadingMealPlans && mealPlans.length === 0 ? (
-                        <p className="helper">No meal plans yet. Your first saved plan will show up here.</p>
-                      ) : null}
+                      {isLoadingMealPlans ? <p className="helper">Ladowanie planow posilkow...</p> : null}
+                      {!isLoadingMealPlans && mealPlans.length === 0 ? <p className="helper">Brak planow posilkow.</p> : null}
 
                       {mealPlans.map((mealPlan) => (
                         <button
@@ -1254,17 +1073,17 @@ function App() {
                         >
                           <strong>{mealPlan.name}</strong>
                           <span>
-                            {formatDate(mealPlan.start_date)} to {formatDate(mealPlan.end_date)}
+                            {formatDate(mealPlan.start_date)} do {formatDate(mealPlan.end_date)}
                           </span>
-                          <span>{mealPlan.item_count} scheduled meals</span>
+                          <span>{mealPlan.item_count} zaplanowanych posilkow</span>
                         </button>
                       ))}
                     </div>
 
                     <div className="detail-panel">
-                      {isLoadingMealPlanDetail ? <p className="helper">Loading selected meal plan...</p> : null}
+                      {isLoadingMealPlanDetail ? <p className="helper">Ladowanie wybranego planu posilkow...</p> : null}
                       {!isLoadingMealPlanDetail && !selectedMealPlan ? (
-                        <p className="helper">Select a meal plan to view its details.</p>
+                        <p className="helper">Wybierz plan posilkow, aby zobaczyc szczegoly.</p>
                       ) : null}
 
                       {selectedMealPlan ? (
@@ -1273,13 +1092,13 @@ function App() {
                             <div>
                               <h4>{selectedMealPlan.name}</h4>
                               <p className="helper">
-                                {formatDate(selectedMealPlan.start_date)} to {formatDate(selectedMealPlan.end_date)}
+                                {formatDate(selectedMealPlan.start_date)} do {formatDate(selectedMealPlan.end_date)}
                               </p>
                             </div>
                           </div>
 
                           {groupedMealPlanItems.length === 0 ? (
-                            <p className="helper">This meal plan does not contain any scheduled meals yet.</p>
+                            <p className="helper">Ten plan posilkow nie zawiera jeszcze zaplanowanych posilkow.</p>
                           ) : (
                             groupedMealPlanItems.map((group) => (
                               <section className="day-card" key={group.date}>
